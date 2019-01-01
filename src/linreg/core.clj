@@ -2,6 +2,7 @@
   (:gen-class)
   (:require [clojure.tools.cli :as cli]
             [clojure.string :as str]
+            [com.hypirion.clj-xchart :as c]
             [linreg.common :refer [tap
                                    estimate-price
                                    save-thetas
@@ -14,18 +15,22 @@
                                            (str/join ", " modes))])
                    :default "learn"]
                   ["-f" "--file FILE" "data file"
-                   :default "resources/data.csv"]])
+                   :default "resources/data.csv"]
+                  ["-v" "--visualize" "visualize data or not"
+                   :default false]])
 
 (defn -main
   [& args]
   (let [{errors :errors
          {mode :mode
-          file :file} :options} (cli/parse-opts args cli-options)]
+          file :file
+          visualize? :visualize} :options} (cli/parse-opts args cli-options)]
     (if errors
       (doseq [err errors] (println err))
       (condp = mode
         "learn"
         (try
+          (println visualize?)
           (println "Reading data from" file)
           (with-open [rdr (clojure.java.io/reader file)]
             (->> (line-seq rdr)
@@ -36,7 +41,18 @@
                             (mapv #(/ (read-string %) 1000))
                             (conj data)))
                          [])
-                 (tap (fn [_]
+                 (tap (fn [data]
+                        (when visualize?
+                          (c/view
+                           (c/xy-chart
+                            {"Maxime" {:x (mapv first data)
+                                       :y (mapv second data)}}
+                            {:title "Price of cars over mileage"
+                             :x-axis {:title "Mileage"}
+                             :y-axis {:title "Price"
+                                      :decimal-pattern "$##.##k"}
+                             :theme :matlab
+                             :render-style :scatter})))
                         (println "Calculating...")))
                  (learn)
                  (tap (fn [[theta0 theta1]]
